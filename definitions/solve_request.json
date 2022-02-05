@@ -1,0 +1,37 @@
+{
+    "URL": "http://localhost:6500/grasshopper",
+    "content": {
+        "absolutetolerance": 0.001,
+        "angletolerance": 1.0,
+        "algo": null,
+        "pointer": "md5_77996BBE6275E0EA0564BF666AF66C32",
+        "cachesolve": true,
+        "recursionlevel": 0,
+        "values": [
+            {
+                "ParamName": "A",
+                "InnerTree": {
+                    "0": [
+                        {
+                            "type": "System.Double",
+                            "data": "1.0"
+                        }
+                    ]
+                }
+            },
+            {
+                "ParamName": "B",
+                "InnerTree": {
+                    "0": [
+                        {
+                            "type": "System.Double",
+                            "data": "1.0"
+                        }
+                    ]
+                }
+            }
+        ],
+        "warnings": [],
+        "errors": []
+    }
+}

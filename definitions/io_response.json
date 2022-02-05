@@ -1,0 +1,43 @@
+{
+    "Description": "",
+    "CacheKey": "md5_77996BBE6275E0EA0564BF666AF66C32",
+    "InputNames": [
+        "A",
+        "B"
+    ],
+    "OutputNames": [
+        "RH_OUT:result"
+    ],
+    "Icon": null,
+    "Inputs": [
+        {
+            "Description": "",
+            "AtLeast": 1,
+            "AtMost": 1,
+            "Default": "1",
+            "Minimum": null,
+            "Maximum": null,
+            "Name": "A",
+            "Nickname": null,
+            "ParamType": "Number"
+        },
+        {
+            "Description": "",
+            "AtLeast": 1,
+            "AtMost": 1,
+            "Default": "1",
+            "Minimum": null,
+            "Maximum": null,
+            "Name": "B",
+            "Nickname": null,
+            "ParamType": "Number"
+        }
+    ],
+    "Outputs": [
+        {
+            "Name": "RH_OUT:result",
+            "Nickname": null,
+            "ParamType": "Number"
+        }
+    ]
+}

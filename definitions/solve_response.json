@@ -1,0 +1,23 @@
+{
+    "absolutetolerance": 0.0,
+    "angletolerance": 0.0,
+    "algo": "",
+    "pointer": "md5_77996BBE6275E0EA0564BF666AF66C32",
+    "cachesolve": false,
+    "recursionlevel": 0,
+    "values": [
+        {
+            "ParamName": "RH_OUT:result",
+            "InnerTree": {
+                "{0}": [
+                    {
+                        "type": "System.Double",
+                        "data": "2.0"
+                    }
+                ]
+            }
+        }
+    ],
+    "warnings": [],
+    "errors": []
+}
