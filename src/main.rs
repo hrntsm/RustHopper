@@ -4,6 +4,7 @@ use serde_json::Value;
 use base64::encode;
 use std::collections::HashMap;
 use std::fs::File;
+
 use std::io::Read;
 
 #[tokio::main]
@@ -37,24 +38,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("response /io \n{:#?}", res.cache_key);
 
+    let mut tree_a = HashMap::new();
+    tree_a.insert(
+        String::from("0"),
+        vec![InnerData {
+            type_field: String::from("System.Double"),
+            data: String::from("1.0"),
+        }],
+    );
+
+    let mut tree_b = HashMap::new();
+    tree_b.insert(
+        String::from("0"),
+        vec![InnerData {
+            type_field: String::from("System.Double"),
+            data: String::from("2.0"),
+        }],
+    );
+
     let gh_values: Vec<GHValue> = vec![
         GHValue {
             param_name: String::from("A"),
-            inner_tree: InnerTree {
-                n0: vec![n0 {
-                    type_field: String::from("System.Double"),
-                    data: String::from("1.0"),
-                }],
-            },
+            inner_tree: tree_a,
         },
         GHValue {
             param_name: String::from("B"),
-            inner_tree: InnerTree {
-                n0: vec![n0 {
-                    type_field: String::from("System.Double"),
-                    data: String::from("2.0"),
-                }],
-            },
+            inner_tree: tree_b,
         },
     ];
 
@@ -70,19 +79,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         errors: Vec::new(),
     };
 
-    let text = serde_json::to_string(&post_solve)?;
-    println!("{}", text);
+    let solve_body = serde_json::to_string(&post_solve)?;
+
+    println!("solve body: \n{}", solve_body);
 
     let solve_client = reqwest::Client::new();
     let solve_res = solve_client
         .post(solve_url)
-        .body(text)
+        .body(solve_body)
         .send()
         .await?
-        .text()
+        // .text()
+        .json::<Root>()
         .await?;
 
-    println!("response /grasshopper \n{:#?}", solve_res);
+    let sum_result: &str = &solve_res.values[0].inner_tree["{0}"][0].data;
+    let sum_float: f64 = sum_result.parse().unwrap();
+
+    println!(
+        "response /grasshopper \n{:#?}",
+        sum_float
+    );
 
     Ok(())
 }
@@ -160,19 +177,12 @@ pub struct GHValue {
     #[serde(rename = "ParamName")]
     pub param_name: String,
     #[serde(rename = "InnerTree")]
-    pub inner_tree: InnerTree,
+    pub inner_tree: HashMap<String, Vec<InnerData>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct InnerTree {
-    #[serde(rename = "0")]
-    pub n0: Vec<n0>,
-}
-
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct n0 {
+pub struct InnerData {
     #[serde(rename = "type")]
     pub type_field: String,
     pub data: String,
