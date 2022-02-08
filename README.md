@@ -28,27 +28,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut tree = HashMap::new();
     tree.insert(
-        String::from("{0}"),
+        "0".to_string(),
         vec![io::RestHopperObject {
-            object_type: String::from("System.Double"),
-            data: String::from("1.0"),
+            object_type: "System.Double".to_string(),
+            data: "1.0".to_string(),
         }],
     );
     input_tree.push(io::DataTree {
-        param_name: String::from("A"),
+        param_name: "A".to_string(),
         inner_tree: tree,
     });
 
     let mut tree = HashMap::new();
     tree.insert(
-        String::from("{0}"),
+        "0".to_string(),
         vec![io::RestHopperObject {
-            object_type: String::from("System.Double"),
-            data: String::from("2.0"),
+            object_type: "System.Double".to_string(),
+            data: "2.0".to_string(),
         }],
     );
     input_tree.push(io::DataTree {
-        param_name: String::from("B"),
+        param_name: "B".to_string(),
         inner_tree: tree,
     });
 
