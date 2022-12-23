@@ -306,3 +306,412 @@ I'll describe the details of the implementation in the Rust part later on.
 
 First, create a new package using cargo.
 If you name it "rusthopper", it will look like this.
+
+```bash
+cargo new rusthopper
+```
+
+I'm going to use this to create it now.
+
+### Creating structure for IO with Json
+
+Before creating the communication part, we create a structure to easily exchange Json in Input/Output.
+Note that there is no class in Rust.
+The crate that supports serialization/deserialization of Json is mainly serde in Rust.
+Dependencies can be resolved in Cargo.toml.
+
+```toml
+[dependencies]
+serde = "1.0.136"
+serde_derive = "1.0.136"
+serde_json = "1.0.78"
+```
+
+Create an io.rs file in the src directory and create a structure for I/O Json in it.
+
+This structure is based on [Schema.cs](https://github.com/mcneel/compute.rhino3d/blob/master/src/compute.geometry/IO/Schema.cs) in RhinoCompute repository.
+As mentioned above, RhinoCompute uses this class for processing, so you can exchange data smoothly by following this Schema.
+
+However, implementing this from scratch is tedious, so it's easier to use an automatic implementation.
+For example, [transform.tools](https://transform.tools/json-to-rust-serde) can create a Rust structure from Json,
+so I recommend you to use it as a base and modify the missing parts by hand.
+
+Use Json output from Hops. As an example, the conversion of Json to IO posted by Hops is as follows.
+
+Before
+
+```json
+{
+  "absolutetolerance": 0.0,
+  "angletolerance": 0.0,
+  "algo": "7VgJUBNZGk4gQ.....",
+  "pointer": null,
+  "cachesolve": false,
+  "recursionlevel": 0,
+  "values": [],
+  "warnings": [],
+  "errors": []
+}
+```
+
+After
+
+```rs
+use serde_derive::Deserialize;
+use serde_derive::Serialize;
+use serde_json::Value;
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Root {
+    pub absolutetolerance: f64,
+    pub angletolerance: f64,
+    pub algo: String,
+    pub pointer: Value,
+    pub cachesolve: bool,
+    pub recursionlevel: i64,
+    pub values: Vec<Value>,
+    pub warnings: Vec<Value>,
+    pub errors: Vec<Value>,
+}
+```
+
+The parts of Json that are null or empty arrays are not automatically typed, so let's fix them by looking at the Schema.
+The result of the modification is as follows.
+
+```rs
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Schema {
+    pub absolutetolerance: f64,
+    pub angletolerance: f64,
+    pub algo: Option<String>,
+    pub pointer: Option<String>,
+    pub cachesolve: bool,
+    pub recursionlevel: i64,
+    pub values: Vec<DataTree>,
+    pub warnings: Vec<String>,
+    pub errors: Vec<String>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DataTree {
+    #[serde(rename = "ParamName")]
+    pub param_name: String,
+    #[serde(rename = "InnerTree")]
+    pub inner_tree: HashMap<String, Vec<RestHopperObject>>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestHopperObject {
+    #[serde(rename = "type")]
+    pub object_type: String,
+    pub data: String,
+}
+```
+
+Since `algo` and `pointer` can be null (or None in Rust), we use Option Enum to handle None or Some(T).
+
+`warnings` and `errors` are Vec\<String\> arrays of strings
+
+The `values` structure `DataTree` is created separately to contain the information of Grasshopper's tree.
+In C# Schema files, DataTree is handled differently, but for simplicity, we use a different structure here.
+A DataTree consists of a `param_name`, which is the name of the parameter,
+a String that is the path to the value of the parameter,
+and a HashMap of the `inner_tree` that contains the actual value.
+
+The Response structure is created in the same way. The following is the created content. This is the same as C#'s Schema.cs but rewritten into a Rust structure.
+
+```rs
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IoResponseSchema {
+    #[serde(rename = "Description")]
+    pub description: Option<String>,
+    #[serde(rename = "CacheKey")]
+    pub cache_key: Option<String>,
+    #[serde(rename = "InputNames")]
+    pub input_names: Vec<String>,
+    #[serde(rename = "OutputNames")]
+    pub output_names: Vec<String>,
+    #[serde(rename = "Icon")]
+    pub icon: Option<String>,
+    #[serde(rename = "Inputs")]
+    pub inputs: Vec<InputParamSchema>,
+    #[serde(rename = "Outputs")]
+    pub outputs: Vec<IoParamSchema>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InputParamSchema {
+    #[serde(rename = "Description")]
+    pub description: String,
+    #[serde(rename = "AtLeast")]
+    pub at_least: f64,
+    #[serde(rename = "AtMost")]
+    pub at_most: f64,
+    #[serde(rename = "Default")]
+    pub default: String,
+    #[serde(rename = "Minimum")]
+    pub minimum: f64,
+    #[serde(rename = "Maximum")]
+    pub maximum: f64,
+    #[serde(rename = "Name")]
+    pub name: String,
+    #[serde(rename = "Nickname")]
+    pub nickname: Option<String>,
+    #[serde(rename = "ParamType")]
+    pub param_type: String,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IoParamSchema {
+    #[serde(rename = "Name")]
+    pub name: Option<String>,
+    #[serde(rename = "Nickname")]
+    pub nickname: Option<String>,
+    #[serde(rename = "ParamType")]
+    pub param_type: Option<String>,
+}
+```
+
+### Creating the communication part
+
+Now that the structure for IO has been created, the next step is to create the part that posts them.
+As necessary dependencies, add base64 which converts binary (gh file) to Base64 for communication,
+reqwest for communication and tokio which is necessary for asynchronization to the dependencies.
+
+```toml
+[dependencies]
+base64 = "0.13.0"
+reqwest = { version = "0.11", features = ["json"] }
+serde = "1.0.136"
+serde_derive = "1.0.136"
+serde_json = "1.0.78"
+tokio =  { version = "1", features = ["full"] }
+```
+
+First, create a part that posts a Grasshopper file to /io.
+The implementation is to take the path to the gh file as an argument with &str, and return the result of the post as Result.
+Also, `async` is added at the beginning to make the function asynchronous because it is a communication.
+
+Since it's a post to /io, I'm expecting algo to contain the data from the gh file,
+and the response to return the cache_key for that data.
+
+```rs
+use base64::encode;
+use std::fs::File;
+use std::io::Read;
+
+use crate::{io, URL};
+
+async fn upload_definition(
+    gh_path: &str,
+) -> Result<io::IoResponseSchema, Box<dyn std::error::Error>> {
+    // create io URL
+    let io_url = URL.to_owned() + "io";
+
+    // encode to Base64
+    let mut gh_file = File::open(gh_path).unwrap();
+    let mut buf = Vec::new();
+    let _ = gh_file.read_to_end(&mut buf);
+    let encoded: &str = &encode(&buf);
+
+    // serialize Json
+    let io_schema = io::Schema {
+        absolutetolerance: 0.0,
+        angletolerance: 0.0,
+        algo: Some(encoded.to_owned()),
+        pointer: None,
+        cachesolve: false,
+        recursionlevel: 0,
+        values: Vec::new(),
+        warnings: Vec::new(),
+        errors: Vec::new(),
+    };
+    let io_body = serde_json::to_string(&io_schema)?;
+
+    // post & deserialize its result
+    let client = reqwest::Client::new();
+    let res = client
+        .post(io_url)
+        .body(io_body)
+        .send()
+        .await?
+        .json::<io::IoResponseSchema>()
+        .await?;
+
+    Ok(res)
+}
+```
+
+Rust is often said to have a strict compiler. In the above example,
+I put the string "0.0" and run `cargo check`, even though the absolutetolerance is f64.
+
+```rs
+let io_schema = io::Schema {
+    absolutetolerance: "0.0",
+```
+
+The result is as follows, the compiler will tell you in detail what is wrong and how it is wrong.
+Basically, if you follow the compiler's instructions honestly, the code will be finished.
+
+```bash
+error[E0308]: mismatched types
+  --> src\grasshopper.rs:15:28
+   |
+15 |         absolutetolerance: "0.0",
+   |                            ^^^^^ expected `f64`, found `&str`
+```
+
+The response from /io will return the cache key of the gh file you posted,
+so we'll use that to create the part that actually evaluates the file.
+
+The implementation follows mcneel's Python compute-rhino3d implementation,
+taking a gh file path and a DataTree and processing it.
+
+```rs
+pub async fn evaluate_definition(
+    gh_path: &str,
+    data_tree: Vec<io::DataTree>,
+) -> Result<io::Schema, Box<dyn std::error::Error>> {
+
+    // get cache_key
+    let cache_key = upload_definition(gh_path).await?.cache_key;
+
+    // create io URL
+    let solve_url = URL.to_owned() + "grasshopper";
+
+    // Serialize to Json
+    let solve_schema = io::Schema {
+        absolutetolerance: 0.001,
+        angletolerance: 1.0,
+        cachesolve: false,
+        algo: None,
+        pointer: cache_key,
+        recursionlevel: 0,
+        values: data_tree,
+        warnings: Vec::new(),
+        errors: Vec::new(),
+    };
+    let solve_body = serde_json::to_string(&solve_schema)?;
+
+    // post json & deserialize its result
+    let solve_client = reqwest::Client::new();
+    let solve_res = solve_client
+        .post(solve_url)
+        .body(solve_body)
+        .send()
+        .await?
+        .json::<io::Schema>()
+        .await?;
+
+    Ok(solve_res)
+}
+```
+
+This completes the part of the Grasshopper file that executes and retrieves the values.
+
+### Creating main.rs
+
+Now that the IO part and the communication part have been created,
+we will put them together to create the part that actually creates the data to be posted and displays the results.
+
+```rs
+mod grasshopper;
+mod io;
+
+use std::collections::HashMap;
+
+// create base URL
+const URL: &str = "http://localhost:6500/";
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+    // set .gh file path
+    let gh_path = "definitions/sum.gh";
+
+    // create DateTree for input
+    let mut input_tree: Vec<io::DataTree> = Vec::new();
+    let mut tree = HashMap::new();
+    tree.insert(
+        "0".to_string(),
+        vec![io::RestHopperObject {
+            object_type: "System.Double".to_string(),
+            data: "1.0".to_string(),
+        }],
+    );
+    input_tree.push(io::DataTree {
+        param_name: "A".to_string(),
+        inner_tree: tree,
+    });
+
+    let mut tree = HashMap::new();
+    tree.insert(
+        "0".to_string(),
+        vec![io::RestHopperObject {
+            object_type: "System.Double".to_string(),
+            data: "2.0".to_string(),
+        }],
+    );
+    input_tree.push(io::DataTree {
+        param_name: "B".to_string(),
+        inner_tree: tree,
+    });
+
+    // post date to RhinoCompute & get result
+    let output = grasshopper::evaluate_definition(gh_path, input_tree).await?;
+
+    // Show result
+    // error
+    let errors = output.errors;
+    if !errors.is_empty() {
+        println!("Errors:");
+        for error in errors {
+            println!("{}", error);
+        }
+    }
+
+    // warning
+    let warnings = output.warnings;
+    if !warnings.is_empty() {
+        println!("Warnings:");
+        for warning in warnings {
+            println!("{}", warning);
+        }
+    }
+
+    // result in RH_OUT
+    let values = output.values;
+    for value in values {
+        let name = value.param_name;
+        let inner_tree = value.inner_tree;
+        println!("{}", name);
+        for (key, value) in inner_tree {
+            println!("{}", key);
+            for v in value {
+                println!("{}", v.data);
+            }
+        }
+    }
+
+    Ok(())
+}
+```
+
+Once you've done all that, run `cargo check` to make sure everything is ok.
+If everything is fine, start RhinoCompute and do `cargo run` to run the code and make sure it returns the correct results.
+
+## Summary
+
+How did you like the example of running RhinoCompute in Rust?
+It's a very different language from C# or Python, so I'm sure you had a hard time with it,
+but I'm sure you felt the power of Rust's powerful compiler when you actually wrote the code as you went along.
+
+I don't think we'll be using Rust much in the architecture field,
+but if you get the chance, please give Rust a try.
