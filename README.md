@@ -1,6 +1,7 @@
 # RustHopper
-
-![](https://raw.githubusercontent.com/hrntsm/RustHopper/6a0671479ac20414cf5054117cbb80cd56938ad9/image/home-og.svg)
+<p align="center">
+    <img width="50%" src="https://raw.githubusercontent.com/hrntsm/RustHopper/6a0671479ac20414cf5054117cbb80cd56938ad9/image/home-og.svg">
+</p>
 
 This is a crate to run grasshopper with RhinoCompute from rust.  
 The input data can be created by entering into main.rs the same Python code that the Hops component generates to run on RhinoCompute.
