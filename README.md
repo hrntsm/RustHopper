@@ -3,6 +3,12 @@
 This is a crate to run grasshopper with RhinoCompute from rust.  
 The input data can be created by entering into main.rs the same Python code that the Hops component generates to run on RhinoCompute.
 
+# LICENSE
+
+This library is released under the MIT License.
+
+Rust icon : Rust Foundation, CC 4.0, https://commons.wikimedia.org/w/index.php?curid=40715219
+
 # How to use
 
 This is a sample code to run sum.gh in the definitions directory.
@@ -45,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             data: "2.0".to_string(),
         }],
     );
-    input_tree.push(io::DataTree {
+    input_tree.push(io::DataTree {i
         param_name: "B".to_string(),
         inner_tree: tree,
     });
@@ -715,3 +721,4 @@ but I'm sure you felt the power of Rust's powerful compiler when you actually wr
 
 I don't think we'll be using Rust much in the architecture field,
 but if you get the chance, please give Rust a try.
+
